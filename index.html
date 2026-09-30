@@ -4,51 +4,65 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Inventaris Aset Cloud</title>
-    <!-- SDK Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }
         body { background-color: #f1f5f9; color: #1e293b; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 20px; }
         .header h1 { font-size: 20px; color: #0f172a; }
         .header-actions { display: flex; gap: 8px; }
-
         .btn { padding: 8px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; border: none; transition: 0.2s; }
         .btn-primary { background-color: #2563eb; color: white; }
         .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-warning { background-color: #eab308; color: white; }
+        .btn-warning:hover { background-color: #ca8a04; }
         .btn-outline { background: white; border: 1px solid #cbd5e1; color: #334155; }
         .btn-outline:hover { background: #f8fafc; }
-        .btn-danger { background: #ef4444; color: white; padding: 4px 8px; font-size: 11px; }
-
-        /* Panel Admin */
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        
         #adminPanel { display: none; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
         .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 10px; }
         .form-group { display: flex; flex-direction: column; }
         .form-group label { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; }
         .form-group input, .form-group select { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
-
+        
         .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
         .search-filter { display: flex; gap: 8px; }
         .search-filter input, .search-filter select { padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
-
+        
         .table-responsive { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; text-align: left; }
         th, td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
         th { background-color: #f8fafc; color: #475569; font-weight: 600; }
-        
         .badge { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
         .badge-baik { background-color: #dcfce7; color: #166534; }
         .badge-perbaikan { background-color: #fef9c3; color: #854d0e; }
         .badge-rusak { background-color: #fee2e2; color: #991b1b; }
+
+        .item-clickable { color: #2563eb; text-decoration: underline; cursor: pointer; font-weight: 600; }
+        .item-clickable:hover { color: #1d4ed8; }
+
+        /* Modal / Pop-up Styles */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-card { background: white; padding: 24px; border-radius: 12px; max-width: 600px; width: 90%; position: relative; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px; }
+        .modal-header h2 { font-size: 18px; color: #0f172a; }
+        .close-btn { font-size: 24px; font-weight: bold; cursor: pointer; color: #64748b; }
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; text-align: left; }
+        .detail-item { background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; }
+        .detail-item span { font-size: 11px; color: #64748b; display: block; font-weight: 600; text-transform: uppercase; }
+        .detail-item strong { font-size: 13px; color: #1e293b; }
+        .photo-container { text-align: center; margin-bottom: 16px; background: #f1f5f9; padding: 12px; border-radius: 8px; }
+        .photo-container img { max-width: 100%; max-height: 250px; border-radius: 6px; object-fit: contain; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header">
-        <h1>☁️ Inventaris Aset Kantor (Cloud)</h1>
+        <h1>☁️ Inventaris Aset Kantor</h1>
         <div class="header-actions">
             <button class="btn btn-outline" onclick="exportCSV()">📥 Export CSV</button>
             <button class="btn btn-outline" onclick="window.print()">🖨️ Cetak / PDF</button>
@@ -56,7 +70,7 @@
         </div>
     </div>
 
-    <!-- Panel Form Admin -->
+    <!-- Panel Input Tambah Aset Baru (Admin Mode) -->
     <div id="adminPanel">
         <h3 style="font-size: 15px; color: #1e293b;">+ Input Aset Baru (Admin Mode)</h3>
         <form id="assetForm" class="form-grid">
@@ -66,7 +80,11 @@
             </div>
             <div class="form-group">
                 <label>Nama Barang</label>
-                <input type="text" id="namaBarang" placeholder="Contoh: Laptop Dell" required>
+                <input type="text" id="namaBarang" placeholder="Contoh: Kamera DSLR" required>
+            </div>
+            <div class="form-group">
+                <label>Merek / Model</label>
+                <input type="text" id="merk" placeholder="Contoh: Canon EOS 80D" required>
             </div>
             <div class="form-group">
                 <label>Tanggal Perolehan</label>
@@ -78,7 +96,7 @@
             </div>
             <div class="form-group">
                 <label>Pengguna / Divisi</label>
-                <input type="text" id="pengguna" placeholder="Contoh: HRD" required>
+                <input type="text" id="pengguna" placeholder="Contoh: Tim Media" required>
             </div>
             <div class="form-group">
                 <label>Kondisi</label>
@@ -90,13 +108,16 @@
             </div>
             <div class="form-group">
                 <label>Lokasi Kantor</label>
-                <input type="text" id="lokasi" placeholder="Contoh: Lt. 2 Ruang HR" required>
+                <input type="text" id="lokasi" placeholder="Contoh: Studio Foto Lt. 3" required>
+            </div>
+            <div class="form-group">
+                <label>Foto Barang (Cloudinary)</label>
+                <input type="file" id="fotoBarang" accept="image/*">
             </div>
             <button type="submit" class="btn btn-primary" style="grid-column: 1/-1; margin-top: 6px;">Simpan Ke Cloud</button>
         </form>
     </div>
 
-    <!-- Controls Filter & Search -->
     <div class="controls">
         <div class="search-filter">
             <select id="filterTahun" onchange="renderTable()">
@@ -109,7 +130,6 @@
         </div>
     </div>
 
-    <!-- Tabel Data -->
     <div class="table-responsive">
         <table>
             <thead>
@@ -121,7 +141,7 @@
                     <th>Pengguna</th>
                     <th>Kondisi</th>
                     <th>Lokasi</th>
-                    <th id="thAksi" style="display:none;">Aksi</th>
+                    <th id="thAksi" style="display:none;">Aksi Admin</th>
                 </tr>
             </thead>
             <tbody id="assetTableBody">
@@ -131,17 +151,122 @@
     </div>
 </div>
 
-<script>
-    // URL dan Anon Key milikmu
-    const SUPABASE_URL = 'https://imfriukbhdsjwlushzhh.supabase.co'; 
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltZnJpdWtiaGRzandsdXNoempoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3NTA2MzIsImV4cCI6MjEwNjMyNjYzMn0.QJdiJ9cNop2ZvIVq2AE1gbm8uEUODxpfiu-ZmMjePwE';
-    
-    const PIN_ADMIN = '1234'; 
+<!-- Modal Pop-Up Halaman Detail Aset -->
+<div id="detailModal" class="modal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h2 id="detailNamaBarang">Detail Barang</h2>
+            <span class="close-btn" onclick="tutupDetailModal()">&times;</span>
+        </div>
+        <div class="photo-container">
+            <img id="detailFoto" src="" alt="Foto Aset">
+            <p id="noFotoText" style="display:none; color:#94a3b8; font-size:12px;">Foto barang tidak tersedia</p>
+        </div>
+        <div class="detail-grid">
+            <div class="detail-item">
+                <span>Merek / Model</span>
+                <strong id="detailMerk">-</strong>
+            </div>
+            <div class="detail-item">
+                <span>Tahun Data</span>
+                <strong id="detailTahun">-</strong>
+            </div>
+            <div class="detail-item">
+                <span>Tanggal Perolehan</span>
+                <strong id="detailTanggal">-</strong>
+            </div>
+            <div class="detail-item">
+                <span>Kuantitas</span>
+                <strong id="detailKuantitas">-</strong>
+            </div>
+            <div class="detail-item">
+                <span>Pengguna / Divisi</span>
+                <strong id="detailPengguna">-</strong>
+            </div>
+            <div class="detail-item">
+                <span>Kondisi Barang</span>
+                <strong id="detailKondisi">-</strong>
+            </div>
+            <div class="detail-item" style="grid-column: 1/-1;">
+                <span>Lokasi Penyimpanan</span>
+                <strong id="detailLokasi">-</strong>
+            </div>
+        </div>
+    </div>
+</div>
 
-    let db = null;
-    if (typeof supabase !== 'undefined') {
-        db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    }
+<!-- Modal Pop-Up Edit Data Aset -->
+<div id="editModal" class="modal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h2>✏️ Edit Data Aset</h2>
+            <span class="close-btn" onclick="tutupEditModal()">&times;</span>
+        </div>
+        <form id="editAssetForm" class="form-grid">
+            <input type="hidden" id="editId">
+            <input type="hidden" id="editExistingFotoUrl">
+
+            <div class="form-group">
+                <label>Tahun Data</label>
+                <input type="number" id="editTahun" required min="2000" max="2100">
+            </div>
+            <div class="form-group">
+                <label>Nama Barang</label>
+                <input type="text" id="editNamaBarang" required>
+            </div>
+            <div class="form-group">
+                <label>Merek / Model</label>
+                <input type="text" id="editMerk" required>
+            </div>
+            <div class="form-group">
+                <label>Tanggal Perolehan</label>
+                <input type="date" id="editTanggalPerolehan" required>
+            </div>
+            <div class="form-group">
+                <label>Kuantitas</label>
+                <input type="number" id="editKuantitas" min="1" required>
+            </div>
+            <div class="form-group">
+                <label>Pengguna / Divisi</label>
+                <input type="text" id="editPengguna" required>
+            </div>
+            <div class="form-group">
+                <label>Kondisi</label>
+                <select id="editKondisi">
+                    <option value="Baik">Baik</option>
+                    <option value="Perlu Perbaikan">Perlu Perbaikan</option>
+                    <option value="Rusak">Rusak</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Lokasi Kantor</label>
+                <input type="text" id="editLokasi" required>
+            </div>
+            <div class="form-group" style="grid-column: 1/-1;">
+                <label>Ganti Foto (Opsional)</label>
+                <input type="file" id="editFotoBarang" accept="image/*">
+            </div>
+            
+            <div style="grid-column: 1/-1; display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
+                <button type="button" class="btn btn-outline" onclick="tutupEditModal()">Batal</button>
+                <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // KONFIGURASI SUPABASE DATABASE
+    const SUPABASE_URL = 'https://imfriukbhdsjwlushzjh.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_-3zLwSIZ5hJRrS3JZaQG5A_Fmul6ISC';
+    const PIN_ADMIN = '1234';
+
+    // KONFIGURASI CLOUDINARY STORAGE (GANTI DUA BARIS INI DENGAN AKUN CLOUDINARY MU)
+    // KONFIGURASI CLOUDINARY STORAGE
+    const CLOUDINARY_CLOUD_NAME = 'kdgisdko';       
+    const CLOUDINARY_UPLOAD_PRESET = 'ml_default'; 
+
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let assetsData = [];
     let isAdminMode = false;
@@ -149,7 +274,6 @@
     document.getElementById('tanggalPerolehan').valueAsDate = new Date();
     document.getElementById('tahun').value = new Date().getFullYear();
 
-    // Fungsi Klik Tombol Admin
     function bukaAdminMode() {
         if (!isAdminMode) {
             let inputPin = prompt('Masukkan PIN Admin untuk mengedit data:');
@@ -159,7 +283,7 @@
                 document.getElementById('toggleAdminBtn').textContent = '🔓 Keluar Mode Admin';
                 document.getElementById('toggleAdminBtn').className = 'btn btn-outline';
             } else if (inputPin !== null) {
-                alert('PIN Salah! (Gunakan PIN default: 1234)');
+                alert('PIN Salah!');
             }
         } else {
             isAdminMode = false;
@@ -171,58 +295,181 @@
     }
 
     async function fetchAssets() {
-        if (!db) {
-            document.getElementById('assetTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center; color:red;">Gagal memuat pustaka Supabase. Pastikan koneksi internet aktif.</td></tr>';
-            return;
-        }
-
         try {
-            const { data, error } = await db.from('assets').select('*').order('tahun', { ascending: false });
-            if (error) {
-                console.error(error);
-                document.getElementById('assetTableBody').innerHTML = `<tr><td colspan="8" style="text-align:center; color:red;">Status Database: ${error.message} (Jalankan kode SQL di Supabase terlebih dahulu)</td></tr>`;
-                return;
-            }
+            const { data, error } = await supabaseClient
+                .from('assets')
+                .select('*')
+                .order('tahun', { ascending: false });
+
+            if (error) throw error;
+
             assetsData = data || [];
             updateYearFilterOptions();
             renderTable();
         } catch (err) {
             console.error(err);
-            document.getElementById('assetTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center; color:red;">Koneksi terputus.</td></tr>';
+            document.getElementById('assetTableBody').innerHTML = `<tr><td colspan="8" style="text-align:center; color:red;">Gagal memuat data: ${err.message}.</td></tr>`;
         }
     }
 
+    // SIMPAN DATA ASET BARU (TAMBAH)
     document.getElementById('assetForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!db) return alert('Database belum terhubung.');
+
+        const fileInput = document.getElementById('fotoBarang');
+        let fotoUrl = null;
+
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+            try {
+                const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const cloudData = await res.json();
+                if (cloudData.secure_url) {
+                    fotoUrl = cloudData.secure_url;
+                } else {
+                    return alert('Gagal upload ke Cloudinary. Cek Cloud Name & Preset.');
+                }
+            } catch (err) {
+                return alert('Kesalahan koneksi Cloudinary: ' + err.message);
+            }
+        }
 
         const newAsset = {
             tahun: parseInt(document.getElementById('tahun').value),
             nama_barang: document.getElementById('namaBarang').value,
+            merk: document.getElementById('merk').value,
             tanggal_perolehan: document.getElementById('tanggalPerolehan').value,
             kuantitas: parseInt(document.getElementById('kuantitas').value),
             pengguna: document.getElementById('pengguna').value,
             kondisi: document.getElementById('kondisi').value,
-            lokasi: document.getElementById('lokasi').value
+            lokasi: document.getElementById('lokasi').value,
+            foto_url: fotoUrl
         };
 
-        const { error } = await db.from('assets').insert([newAsset]);
-        if (error) {
-            alert('Gagal menyimpan ke database: ' + error.message);
-        } else {
-            alert('Aset berhasil ditambahkan ke Cloud!');
-            document.getElementById('assetForm').reset();
-            document.getElementById('tanggalPerolehan').valueAsDate = new Date();
-            document.getElementById('tahun').value = new Date().getFullYear();
-            fetchAssets();
+        try {
+            const { error } = await supabaseClient
+                .from('assets')
+                .insert([newAsset]);
+
+            if (error) {
+                alert('Gagal menyimpan: ' + error.message);
+            } else {
+                alert('Aset berhasil ditambahkan!');
+                document.getElementById('assetForm').reset();
+                document.getElementById('tanggalPerolehan').valueAsDate = new Date();
+                document.getElementById('tahun').value = new Date().getFullYear();
+                fetchAssets();
+            }
+        } catch (err) {
+            alert('Kesalahan koneksi saat menyimpan: ' + err.message);
+        }
+    });
+
+    // BUKA MODAL EDIT DAN ISI FORM DENGAN DATA EKSISTING
+    function bukaEditModal(id) {
+        const item = assetsData.find(a => a.id === id);
+        if (!item) return;
+
+        document.getElementById('editId').value = item.id;
+        document.getElementById('editTahun').value = item.tahun;
+        document.getElementById('editNamaBarang').value = item.nama_barang;
+        document.getElementById('editMerk').value = item.merk || '';
+        document.getElementById('editTanggalPerolehan').value = item.tanggal_perolehan;
+        document.getElementById('editKuantitas').value = item.kuantitas;
+        document.getElementById('editPengguna').value = item.pengguna;
+        document.getElementById('editKondisi').value = item.kondisi;
+        document.getElementById('editLokasi').value = item.lokasi;
+        document.getElementById('editExistingFotoUrl').value = item.foto_url || '';
+        document.getElementById('editFotoBarang').value = '';
+
+        document.getElementById('editModal').style.display = 'flex';
+    }
+
+    function tutupEditModal() {
+        document.getElementById('editModal').style.display = 'none';
+    }
+
+    // SIMPAN PERUBAHAN HASIL EDIT
+    document.getElementById('editAssetForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const id = document.getElementById('editId').value;
+        const fileInput = document.getElementById('editFotoBarang');
+        let fotoUrl = document.getElementById('editExistingFotoUrl').value;
+
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+            try {
+                const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const cloudData = await res.json();
+                if (cloudData.secure_url) {
+                    fotoUrl = cloudData.secure_url;
+                }
+            } catch (err) {
+                return alert('Gagal mengunggah foto baru ke Cloudinary: ' + err.message);
+            }
+        }
+
+        const updatedAsset = {
+            tahun: parseInt(document.getElementById('editTahun').value),
+            nama_barang: document.getElementById('editNamaBarang').value,
+            merk: document.getElementById('editMerk').value,
+            tanggal_perolehan: document.getElementById('editTanggalPerolehan').value,
+            kuantitas: parseInt(document.getElementById('editKuantitas').value),
+            pengguna: document.getElementById('editPengguna').value,
+            kondisi: document.getElementById('editKondisi').value,
+            lokasi: document.getElementById('editLokasi').value,
+            foto_url: fotoUrl
+        };
+
+        try {
+            const { error } = await supabaseClient
+                .from('assets')
+                .update(updatedAsset)
+                .eq('id', id);
+
+            if (error) {
+                alert('Gagal memperbarui: ' + error.message);
+            } else {
+                alert('Aset berhasil diperbarui!');
+                tutupEditModal();
+                fetchAssets();
+            }
+        } catch (err) {
+            alert('Kesalahan koneksi saat memperbarui: ' + err.message);
         }
     });
 
     async function deleteAsset(id) {
-        if (confirm('Yakin ingin menghapus aset ini dari cloud?')) {
-            const { error } = await db.from('assets').delete().eq('id', id);
-            if (error) alert('Gagal menghapus: ' + error.message);
-            else fetchAssets();
+        if (confirm('Yakin ingin menghapus aset ini dari database?')) {
+            try {
+                const { error } = await supabaseClient
+                    .from('assets')
+                    .delete()
+                    .eq('id', id);
+
+                if (error) {
+                    alert('Gagal menghapus: ' + error.message);
+                } else {
+                    fetchAssets();
+                }
+            } catch (err) {
+                alert('Kesalahan koneksi saat menghapus: ' + err.message);
+            }
         }
     }
 
@@ -245,9 +492,9 @@
 
         const filtered = assetsData.filter(i => {
             const matchYear = (selectedYear === 'semua') || (i.tahun == selectedYear);
-            const matchSearch = i.nama_barang.toLowerCase().includes(keyword) ||
-                                i.pengguna.toLowerCase().includes(keyword) ||
-                                i.lokasi.toLowerCase().includes(keyword);
+            const matchSearch = (i.nama_barang && i.nama_barang.toLowerCase().includes(keyword)) ||
+                                (i.pengguna && i.pengguna.toLowerCase().includes(keyword)) ||
+                                (i.lokasi && i.lokasi.toLowerCase().includes(keyword));
             return matchYear && matchSearch;
         });
 
@@ -267,23 +514,60 @@
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td><strong>${i.tahun}</strong></td>
-                <td>${i.nama_barang}</td>
+                <td><span class="item-clickable" onclick="bukaDetailBarang(${i.id})">🔍 ${i.nama_barang}</span></td>
                 <td>${i.tanggal_perolehan}</td>
                 <td>${i.kuantitas}</td>
                 <td>${i.pengguna}</td>
                 <td><span class="badge ${badgeClass}">${i.kondisi}</span></td>
                 <td>${i.lokasi}</td>
-                ${isAdminMode ? `<td><button class="btn btn-danger" onclick="deleteAsset(${i.id})">Hapus</button></td>` : ''}
+                ${isAdminMode ? `
+                    <td>
+                        <button class="btn btn-warning" style="padding:4px 8px; font-size:11px;" onclick="bukaEditModal(${i.id})">✏️ Edit</button>
+                        <button class="btn btn-danger" style="padding:4px 8px; font-size:11px;" onclick="deleteAsset(${i.id})">🗑️ Hapus</button>
+                    </td>
+                ` : ''}
             `;
             tableBody.appendChild(row);
         });
     }
 
+    function bukaDetailBarang(id) {
+        const item = assetsData.find(a => a.id === id);
+        if (!item) return;
+
+        document.getElementById('detailNamaBarang').textContent = item.nama_barang;
+        document.getElementById('detailMerk').textContent = item.merk || '-';
+        document.getElementById('detailTahun').textContent = item.tahun;
+        document.getElementById('detailTanggal').textContent = item.tanggal_perolehan;
+        document.getElementById('detailKuantitas').textContent = item.kuantitas + ' Unit';
+        document.getElementById('detailPengguna').textContent = item.pengguna;
+        document.getElementById('detailKondisi').textContent = item.kondisi;
+        document.getElementById('detailLokasi').textContent = item.lokasi;
+
+        const imgEl = document.getElementById('detailFoto');
+        const noFotoEl = document.getElementById('noFotoText');
+
+        if (item.foto_url) {
+            imgEl.src = item.foto_url;
+            imgEl.style.display = 'inline-block';
+            noFotoEl.style.display = 'none';
+        } else {
+            imgEl.style.display = 'none';
+            noFotoEl.style.display = 'block';
+        }
+
+        document.getElementById('detailModal').style.display = 'flex';
+    }
+
+    function tutupDetailModal() {
+        document.getElementById('detailModal').style.display = 'none';
+    }
+
     function exportCSV() {
         if (assetsData.length === 0) return alert('Tidak ada data.');
-        let csv = "Tahun,Nama Barang,Tanggal Perolehan,Kuantitas,Pengguna,Kondisi,Lokasi\n";
+        let csv = "Tahun,Nama Barang,Merek,Tanggal Perolehan,Kuantitas,Pengguna,Kondisi,Lokasi\n";
         assetsData.forEach(r => {
-            csv += `${r.tahun},"${r.nama_barang}",${r.tanggal_perolehan},${r.kuantitas},"${r.pengguna}","${r.kondisi}","${r.lokasi}"\n`;
+            csv += `${r.tahun},"${r.nama_barang}","${r.merk || ''}",${r.tanggal_perolehan},${r.kuantitas},"${r.pengguna}","${r.kondisi}","${r.lokasi}"\n`;
         });
         const link = document.createElement("a");
         link.href = "data:text/csv;charset=utf-8," + encodeURI(csv);
