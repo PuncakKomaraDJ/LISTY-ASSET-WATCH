@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Inventaris Aset Cloud</title>
+    <!-- SDK Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }
+        body { background-color: #f1f5f9; color: #1e293b; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 20px; }
+        .header h1 { font-size: 20px; color: #0f172a; }
+        .header-actions { display: flex; gap: 8px; }
+
+        .btn { padding: 8px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; border: none; transition: 0.2s; }
+        .btn-primary { background-color: #2563eb; color: white; }
+        .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-outline { background: white; border: 1px solid #cbd5e1; color: #334155; }
+        .btn-outline:hover { background: #f8fafc; }
+        .btn-danger { background: #ef4444; color: white; padding: 4px 8px; font-size: 11px; }
+
+        /* Panel Admin */
+        #adminPanel { display: none; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 10px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+        .form-group input, .form-group select { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+
+        .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+        .search-filter { display: flex; gap: 8px; }
+        .search-filter input, .search-filter select { padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th, td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+        th { background-color: #f8fafc; color: #475569; font-weight: 600; }
+        
+        .badge { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+        .badge-baik { background-color: #dcfce7; color: #166534; }
+        .badge-perbaikan { background-color: #fef9c3; color: #854d0e; }
+        .badge-rusak { background-color: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>☁️ Inventaris Aset Kantor (Cloud)</h1>
+        <div class="header-actions">
+            <button class="btn btn-outline" onclick="exportCSV()">📥 Export CSV</button>
+            <button class="btn btn-outline" onclick="window.print()">🖨️ Cetak / PDF</button>
+            <button id="toggleAdminBtn" class="btn btn-primary" onclick="bukaAdminMode()">🔐 Mode Admin</button>
+        </div>
+    </div>
+
+    <!-- Panel Form Admin -->
+    <div id="adminPanel">
+        <h3 style="font-size: 15px; color: #1e293b;">+ Input Aset Baru (Admin Mode)</h3>
+        <form id="assetForm" class="form-grid">
+            <div class="form-group">
+                <label>Tahun Data</label>
+                <input type="number" id="tahun" required min="2000" max="2100">
+            </div>
+            <div class="form-group">
+                <label>Nama Barang</label>
+                <input type="text" id="namaBarang" placeholder="Contoh: Laptop Dell" required>
+            </div>
+            <div class="form-group">
+                <label>Tanggal Perolehan</label>
+                <input type="date" id="tanggalPerolehan" required>
+            </div>
+            <div class="form-group">
+                <label>Kuantitas</label>
+                <input type="number" id="kuantitas" value="1" min="1" required>
+            </div>
+            <div class="form-group">
+                <label>Pengguna / Divisi</label>
+                <input type="text" id="pengguna" placeholder="Contoh: HRD" required>
+            </div>
+            <div class="form-group">
+                <label>Kondisi</label>
+                <select id="kondisi">
+                    <option value="Baik">Baik</option>
+                    <option value="Perlu Perbaikan">Perlu Perbaikan</option>
+                    <option value="Rusak">Rusak</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Lokasi Kantor</label>
+                <input type="text" id="lokasi" placeholder="Contoh: Lt. 2 Ruang HR" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="grid-column: 1/-1; margin-top: 6px;">Simpan Ke Cloud</button>
+        </form>
+    </div>
+
+    <!-- Controls Filter & Search -->
+    <div class="controls">
+        <div class="search-filter">
+            <select id="filterTahun" onchange="renderTable()">
+                <option value="semua">Semua Tahun</option>
+            </select>
+            <input type="text" id="searchKeyword" placeholder="Cari nama, pengguna, lokasi..." oninput="renderTable()">
+        </div>
+        <div style="font-size: 13px; color: #64748b;">
+            Total Terdata: <strong id="totalCount">0</strong> Aset
+        </div>
+    </div>
+
+    <!-- Tabel Data -->
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tahun</th>
+                    <th>Nama Barang</th>
+                    <th>Tgl Perolehan</th>
+                    <th>Qty</th>
+                    <th>Pengguna</th>
+                    <th>Kondisi</th>
+                    <th>Lokasi</th>
+                    <th id="thAksi" style="display:none;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="assetTableBody">
+                <tr><td colspan="8" style="text-align:center;">Memuat data dari cloud...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // URL dan Anon Key milikmu
+    const SUPABASE_URL = 'https://imfriukbhdsjwlushzhh.supabase.co'; 
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltZnJpdWtiaGRzandsdXNoempoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3NTA2MzIsImV4cCI6MjEwNjMyNjYzMn0.QJdiJ9cNop2ZvIVq2AE1gbm8uEUODxpfiu-ZmMjePwE';
+    
+    const PIN_ADMIN = '1234'; 
+
+    let db = null;
+    if (typeof supabase !== 'undefined') {
+        db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+
+    let assetsData = [];
+    let isAdminMode = false;
+
+    document.getElementById('tanggalPerolehan').valueAsDate = new Date();
+    document.getElementById('tahun').value = new Date().getFullYear();
+
+    // Fungsi Klik Tombol Admin
+    function bukaAdminMode() {
+        if (!isAdminMode) {
+            let inputPin = prompt('Masukkan PIN Admin untuk mengedit data:');
+            if (inputPin === PIN_ADMIN) {
+                isAdminMode = true;
+                document.getElementById('adminPanel').style.display = 'block';
+                document.getElementById('toggleAdminBtn').textContent = '🔓 Keluar Mode Admin';
+                document.getElementById('toggleAdminBtn').className = 'btn btn-outline';
+            } else if (inputPin !== null) {
+                alert('PIN Salah! (Gunakan PIN default: 1234)');
+            }
+        } else {
+            isAdminMode = false;
+            document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('toggleAdminBtn').textContent = '🔐 Mode Admin';
+            document.getElementById('toggleAdminBtn').className = 'btn btn-primary';
+        }
+        renderTable();
+    }
+
+    async function fetchAssets() {
+        if (!db) {
+            document.getElementById('assetTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center; color:red;">Gagal memuat pustaka Supabase. Pastikan koneksi internet aktif.</td></tr>';
+            return;
+        }
+
+        try {
+            const { data, error } = await db.from('assets').select('*').order('tahun', { ascending: false });
+            if (error) {
+                console.error(error);
+                document.getElementById('assetTableBody').innerHTML = `<tr><td colspan="8" style="text-align:center; color:red;">Status Database: ${error.message} (Jalankan kode SQL di Supabase terlebih dahulu)</td></tr>`;
+                return;
+            }
+            assetsData = data || [];
+            updateYearFilterOptions();
+            renderTable();
+        } catch (err) {
+            console.error(err);
+            document.getElementById('assetTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center; color:red;">Koneksi terputus.</td></tr>';
+        }
+    }
+
+    document.getElementById('assetForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!db) return alert('Database belum terhubung.');
+
+        const newAsset = {
+            tahun: parseInt(document.getElementById('tahun').value),
+            nama_barang: document.getElementById('namaBarang').value,
+            tanggal_perolehan: document.getElementById('tanggalPerolehan').value,
+            kuantitas: parseInt(document.getElementById('kuantitas').value),
+            pengguna: document.getElementById('pengguna').value,
+            kondisi: document.getElementById('kondisi').value,
+            lokasi: document.getElementById('lokasi').value
+        };
+
+        const { error } = await db.from('assets').insert([newAsset]);
+        if (error) {
+            alert('Gagal menyimpan ke database: ' + error.message);
+        } else {
+            alert('Aset berhasil ditambahkan ke Cloud!');
+            document.getElementById('assetForm').reset();
+            document.getElementById('tanggalPerolehan').valueAsDate = new Date();
+            document.getElementById('tahun').value = new Date().getFullYear();
+            fetchAssets();
+        }
+    });
+
+    async function deleteAsset(id) {
+        if (confirm('Yakin ingin menghapus aset ini dari cloud?')) {
+            const { error } = await db.from('assets').delete().eq('id', id);
+            if (error) alert('Gagal menghapus: ' + error.message);
+            else fetchAssets();
+        }
+    }
+
+    function updateYearFilterOptions() {
+        const currentSelected = document.getElementById('filterTahun').value;
+        const years = [...new Set(assetsData.map(i => i.tahun))].sort((a,b) => b-a);
+        const filterTahun = document.getElementById('filterTahun');
+        filterTahun.innerHTML = '<option value="semua">Semua Tahun</option>';
+        years.forEach(yr => {
+            filterTahun.innerHTML += `<option value="${yr}">${yr}</option>`;
+        });
+        filterTahun.value = currentSelected;
+    }
+
+    function renderTable() {
+        const tableBody = document.getElementById('assetTableBody');
+        const selectedYear = document.getElementById('filterTahun').value;
+        const keyword = document.getElementById('searchKeyword').value.toLowerCase();
+        document.getElementById('thAksi').style.display = isAdminMode ? 'table-cell' : 'none';
+
+        const filtered = assetsData.filter(i => {
+            const matchYear = (selectedYear === 'semua') || (i.tahun == selectedYear);
+            const matchSearch = i.nama_barang.toLowerCase().includes(keyword) ||
+                                i.pengguna.toLowerCase().includes(keyword) ||
+                                i.lokasi.toLowerCase().includes(keyword);
+            return matchYear && matchSearch;
+        });
+
+        document.getElementById('totalCount').textContent = filtered.length;
+
+        if (filtered.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#94a3b8; padding:15px;">Belum ada data aset terdaftar.</td></tr>';
+            return;
+        }
+
+        tableBody.innerHTML = '';
+        filtered.forEach(i => {
+            let badgeClass = 'badge-baik';
+            if (i.kondisi === 'Perlu Perbaikan') badgeClass = 'badge-perbaikan';
+            if (i.kondisi === 'Rusak') badgeClass = 'badge-rusak';
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>${i.tahun}</strong></td>
+                <td>${i.nama_barang}</td>
+                <td>${i.tanggal_perolehan}</td>
+                <td>${i.kuantitas}</td>
+                <td>${i.pengguna}</td>
+                <td><span class="badge ${badgeClass}">${i.kondisi}</span></td>
+                <td>${i.lokasi}</td>
+                ${isAdminMode ? `<td><button class="btn btn-danger" onclick="deleteAsset(${i.id})">Hapus</button></td>` : ''}
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+
+    function exportCSV() {
+        if (assetsData.length === 0) return alert('Tidak ada data.');
+        let csv = "Tahun,Nama Barang,Tanggal Perolehan,Kuantitas,Pengguna,Kondisi,Lokasi\n";
+        assetsData.forEach(r => {
+            csv += `${r.tahun},"${r.nama_barang}",${r.tanggal_perolehan},${r.kuantitas},"${r.pengguna}","${r.kondisi}","${r.lokasi}"\n`;
+        });
+        const link = document.createElement("a");
+        link.href = "data:text/csv;charset=utf-8," + encodeURI(csv);
+        link.download = `inventaris_cloud_${new Date().toISOString().slice(0,10)}.csv`;
+        link.click();
+    }
+
+    fetchAssets();
+</script>
+
+</body>
+</html>
